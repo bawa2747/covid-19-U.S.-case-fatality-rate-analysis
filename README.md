@@ -21,8 +21,8 @@ Exploratory data analysis of the U.S. Covid-19 case fatality rates by state usin
 Full analysis and code: [COVID-19_US_CFR_Analysis.Rmd](COVID-19_US_CFR_Analysis.Rmd)
 
 ## Files
-`COVID-19_US_CFR_Analysis.Rmd`: source code and full analysis
-`COVID-19_US_CFR_Analysis.pdf`: knitted R Markdown report with visualizations
+- `COVID-19_US_CFR_Analysis.Rmd`: source code and full analysis
+- `COVID-19_US_CFR_Analysis.pdf`: knitted R Markdown report with visualizations
 
 ## Data Source
 [Johns Hopkins CSSE COVID-19 Data Repository](https://github.com/CSSEGISandData/COVID-19), licensed under CC BY 4.0
