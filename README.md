@@ -18,11 +18,13 @@ Exploratory data analysis of the U.S. Covid-19 case fatality rates by state usin
 - Visualizations of the U.S. national CFR trends and state CFR vs. state population density
 - Multiple linear regression model used to identify predictors of state CFR
 
-Full analysis and code: [
+Full analysis and code: [COVID-19_US_CFR_Analysis.Rmd](COVID-19_US_CFR_Analysis.Rmd)
 
 ## Files
+`COVID-19_US_CFR_Analysis.Rmd`: source code and full analysis
+`COVID-19_US_CFR_Analysis.pdf`: knitted R Markdown report with visualizations
 
 ## Data Source
-[Johns Hopkins CSSE COVID-19 Data Repository](https://github.com/CSSEGISandData/COVID-19)
+[Johns Hopkins CSSE COVID-19 Data Repository](https://github.com/CSSEGISandData/COVID-19), licensed under CC BY 4.0
 - `time_series_covid19_confirmed_US.csv`: confirmed cases by state and county
 - `time_series_covid19_deaths_US.csv`: cumulative count of confirmed deaths and total resident population of each county
