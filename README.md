@@ -3,7 +3,7 @@ Exploratory data analysis of the U.S. Covid-19 case fatality rates by state usin
 
 ## Key Findings
 - CFRs started out high then continuously declined, likely due to testing, treatments, and improvement of vaccination rates
-- Population density was a **statistically significant** predictor of a state's CFR
+- Population density was a **statistically significant** predictor of a state's CFR, consistent with CFR geographic variation shown in the choropleth visualization of CFR Total by State vs Population Density by State
 - However, it only explained about **19%** of the variation in CFR, suggesting the remaining 81% of the CFR variation could be affected by variables such as a state's healthcare resources, age and race demographics, and vaccination rates that were not included in the model.
   
 ## Methods
