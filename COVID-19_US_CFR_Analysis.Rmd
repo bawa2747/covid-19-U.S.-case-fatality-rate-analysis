@@ -1,0 +1,313 @@
+---
+title: "COVID-19 Case Fatility Rate Analysis"
+author: "B. Warlum"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```  
+# Introduction
+
+This report demonstrates exploratory data analysis of the Johns Hopkins University Center for Systems Science and Engineering Covid-19 time series data set within the United States from February 29, 2020 to March 9, 2023. In this report, I aim to explore the following questions: 
+
+1. What was the overall trend of the COVID-19 case fatality rate across the United States?
+
+2. Which states had an overall high case fatality rate?
+
+3. What factors can predict a state's case fatality rate?
+
+# Importing Libraries and Data Sets
+```{r warning = FALSE, message = FALSE}
+#Importing libraries
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(usmap)
+
+#Importing Url's 
+url_in <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+file_names <- 
+  c("time_series_covid19_confirmed_US.csv",
+    "time_series_covid19_deaths_US.csv")
+   
+
+urls <- str_c(url_in, file_names)
+
+#Reading in Data Sets
+US_cases_raw <- read.csv(urls[1]) 
+US_deaths_raw <- read.csv(urls[2])
+
+```  
+\newpage
+# Summary of Data sets
+```{r}
+
+#Displaying first data set
+head(US_cases_raw[, 1:12]) %>%
+  kable() 
+
+```  
+
+This first time series data set "time_series_covid19_confirmed_US.csv" shows cumulative count of confirmed cases of COVID-19 across the United States by state and county. This data set includes 12 variables. UID, iso2, iso3, code3, FIPS: All five are ID/location codes that are used to identify the United States and counties. Admin2, Province_State, and Country_Region are again location identifiers stating what county, state, and country the confirmed case was in. Lat and Long_ show the latitude and longitudinal coordinates of the confirmed case. Finally, X1.22.20 is the confirmed cases date for each row and begins with an X due to R's handling of column names that begin with a number.  
+
+```{r}
+
+#Displaying US_deaths_raw data set
+head(US_deaths_raw[, 1:12]) %>%
+  kable() 
+
+```     
+
+This second time series data set "time_series_covid19_deaths_US.csv" shows cumulative count of confirmed deaths from COVID-19 across the United States. This data set has the same 12 variables as US_cases_raw, except for a population variable. This column represents the total resident population of each county. It is based on U.S. Census estimates and is a static value reflecting the population of the counties around 2020. 
+
+# Cleaning the Data Sets
+```{r}
+#Cleaning US Cases Data
+US_cases_cleaned <- US_cases_raw %>%
+
+  #selecting variables for analysis
+  select(-c(UID, iso2, iso3, code3, FIPS, Country_Region, Lat, Long_, Combined_Key)) %>%
+  
+  #Renaming some variables for readability
+  rename(County = Admin2, State = Province_State) %>%
+  #Transforming variables into appropriate data types
+   mutate(County = as.factor(County),State = as.factor(State)) %>%
+  #Ordering by one row per date
+ pivot_longer(cols = -c(County, State),
+               names_to = "date",
+               values_to = "cases") %>%
+#Replaces X in date column with appropriate number and transforms date variable into proper date object
+mutate(date = mdy(gsub("X", "", date))) 
+
+#Cleaning US Deaths Data
+US_deaths_cleaned <- US_deaths_raw %>%
+  
+  #Selecting variables for analysis
+  select(-c(UID, iso2, iso3, code3, FIPS, Country_Region, Lat, Long_, Combined_Key)) %>%
+  #Renaming some variables for readability
+  rename(County = Admin2, State = Province_State) %>%
+  #Transforming variables into appropriate data types
+   mutate(County = as.factor(County), State = as.factor(State)) %>%
+  #Ordering by one row per date
+  pivot_longer(cols = -c(County, State, Population),
+               names_to = "date",
+               values_to = "deaths") %>%
+#Replaces X in date column with appropriate number and transforms date variable into proper date object
+mutate(date = mdy(gsub("X", "", date)))
+
+```  
+To perform my analysis I filtered out from both data sets the variables UID, iso2, iso3, code3, FIPS, Country_Region, Lat, Long_, and Combined_Key. Most of these variables were ID/location codes and redundant. In both data sets I transformed variables I kept for analysis to their appropriate data and factor types. Fixed R's handling of column names that begin with a number and organized the date variable to display per each row. Finally I renamed Admin2 and Province_State to County and State respectively for readability.
+
+```{r}
+
+#Joining data sets together 
+US_national_raw <- US_cases_cleaned %>%
+  left_join(US_deaths_cleaned, by = c("County", "State", "date")) %>%
+  
+  #Creating Column showing Case fatality Rate and where CFR is 0 replace with NA (early pandemic signs)
+  mutate(CFR = deaths/cases) %>%
+  mutate(CFR = ifelse(cases == 0, NA, deaths/cases)) 
+
+#Showing irregular values for cases, population, deaths and CFR
+US_national_raw %>%
+  filter(CFR > 1) %>%
+  arrange(desc(CFR)) %>%
+  slice_sample(n=10) %>%
+kable()
+
+```    
+For my analysis I joined the data sets together by County, State, and date. I then calculated the Case Fatality Rate by dividing deaths/cases representing the proportion of confirmed COVID-19 cases that resulted in death. When looking through the data I noticed irregular rows containing "Unassigned" counties, populations of 0, small case counts, and extremely high CFR's. This could be due to certain state reporting practices where some states were more organized in attributing deaths to certain counties. Death counts sometimes lagged behind case counts resulting in temporary inconsistency. These limitations and potential reporting biases could have resulted in CFR's being underestimated when compared to states with more accurate reporting infrastructure. To address this I filtered out the irregular rows by focusing on cases, population, and deaths were greater than 0. I then filtered out rows where the case fatality rate was unrealistically high by rows where CFR was less than or equal to one. Lastly I filtered out US territories as I wanted to focus on the States.
+
+```{r}
+
+#Filtering out irregular rows
+US_national_cleaned <- US_national_raw %>%
+  filter(cases > 0, Population > 0, deaths > 0, CFR <= 1) %>%
+#Filtering out US territories
+filter(State %in% state.name) 
+
+summary(US_national_cleaned) %>%
+  kable()
+
+```  
+
+# Visualizations
+
+## US Case Fatality Rate Over Time
+```{r}
+US_national_cleaned %>%
+  
+  #Grouping by the date and then finding the total sum for cases and deaths 
+  group_by(date) %>%
+  summarize(total_cases = sum(cases, na.rm = TRUE), total_deaths = sum(deaths, na.rm = TRUE)) %>%
+  
+  #Calculating CFR 
+  mutate(CFR = ifelse(total_cases == 0, NA, total_deaths/total_cases)) %>%
+  
+  #Graphing
+  ggplot(aes(x = date, y = CFR)) + 
+  
+  #Adding point at peak of data
+  geom_point(data = . %>% filter(CFR == max(CFR, na.rm = TRUE)), 
+             aes(x = date, y = CFR), 
+             color = "red", size = 2) +
+  geom_text(data = . %>% filter(CFR == max(CFR, na.rm = TRUE)),
+            aes(x = date, y = CFR, label = "CFR Peak"),
+            color = "red",
+            hjust = -0.1) +
+  
+  #Displaying when Vaccinations began
+  geom_line(linewidth = .6) + 
+  geom_vline(xintercept = as.Date("2020-12-14"),
+             linetype = "dashed", 
+             color = "red") +
+  annotate("text", x = as.Date("2020-12-14"),
+           y = 0.3,
+           hjust = -0.05, 
+           label = "Vaccinations Begin",
+           color = "red") +
+  
+  #Showing when testing expanded and deaths lagged behind
+  geom_vline(xintercept = as.Date("2020-04-15"),
+             linetype = "dashed",
+             color = "blue") + 
+  annotate("text", x = as.Date("2020-04-15"),
+           y = 0.1, 
+           hjust = -0.05,
+           label = "Expanded Testing", 
+           color = "blue") +
+  
+  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
+  scale_y_log10() +
+  theme_minimal() +
+  theme(axis.text = element_text(angle = 90, vjust = 0.5)) +
+  labs(title = "US National Case Fatality Rate", x = "Month", y = "Case Fatality Rate", tag = "A")
+```      
+```{r}
+#Creating graph to show cases and deaths over time
+US_national_cleaned %>%
+  group_by(date) %>%
+  summarize(total_cases = sum(cases, na.rm = TRUE), total_deaths = sum(deaths, na.rm = TRUE)) %>%
+
+  ggplot(aes(x = date, y = total_cases)) +
+  geom_line(aes(color = "Total Cases")) + 
+  geom_line(aes(y = total_deaths, color = "Total Deaths")) + 
+  
+  #Showing when vaccinations began
+  geom_vline(xintercept = as.Date("2020-12-14"),
+             linetype = "dashed", 
+             color = "blue") +
+  annotate("text", x = as.Date("2020-12-14"),
+           y = 10000,
+           hjust = -0.05, 
+           label = "Vaccinations Begin",
+           color = "blue") +
+  
+  #Showing when testing expanded and deaths lagged behind
+  geom_vline(xintercept = as.Date("2020-04-15"),
+             linetype = "dashed",
+             color = "blue") + 
+  annotate("text", x = as.Date("2020-04-15"),
+           y = 500, 
+           hjust = -0.05,
+           label = "Expanded Testing", 
+           color = "blue") +
+  
+   theme_minimal() +
+  scale_y_log10() +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+    labs(title = "United States COVID-19 Cases and Deaths", y = "Count (log scale)", x = "Month", color = "Legend", tag = "B")
+  
+  
+  
+  
+```  
+
+```{r include = FALSE}
+#Finding the max CFR 
+US_national_cleaned %>%
+  group_by(date) %>%
+  summarize(total_cases = sum(cases), total_deaths = sum(deaths)) %>%
+  mutate(CFR = total_deaths/total_cases) %>%
+  filter(CFR == max(CFR))
+```  
+**National Case Fatality Rate Analysis:** 
+
+Plot A shows the United States Case Fatality Rate from February of 2020 to March of 2023. Examining Plot A, we see the case fatality rate peaked around March of 2020. The CFR at the peak was 0.33 signifying about 33% of confirmed cases resulted in death. The CFR peak could be attributed to the CDC initially only testing patients for COVID-19 who had severe respiratory illness. This could have resulted in mild illness going unaccounted for and skewing early confirmed case totals towards the most severe cases likely to end in death. Ultimately this might have artificially inflated the CFR. We then see a sharp decline from the CFR peak in March of 2020 to just before April of 2020. According to the CDC COVID-19 museum timeline (CDC, 2024) starting on April 23, 2020, $631 million in funds from the CARES Act were used to fund and expand the capacity for testing across states health departments. This expansion in capacity allowed mild and asymptomatic cases to be accounted for the first time leading to confirmed cases to rise rapidly compared to deaths contributing to the sharp CFR decline (CDC, 2024). This can be seen reflected in Plot B, depicting the COVID-19 cases and death counts. We see an increase in cases and deaths after the expansion of testing continuing on until the end of the data. Post testing expansion we see the CFR continue a downward trend. This could be due to a number of factors such as the implementation of social distancing, mask mandates, and improved testing/clinical treatments of severe COVID-19 cases. 
+
+In December of 2020, the first COVID-19 vaccinations were administered (CDC, 2024), represented by the dashed red line in Plot A. Following the public vaccine administration, the CFR declined at an even faster rate suggesting vaccines were effective in reducing mortality among confirmed cases. This is also reflected in Plot B where we start to see the gap widen between confirmed cases and deaths. Cases kept rising but deaths did not keep pace. 
+
+## Aggregated Case Fatality Rate by State
+```{r}
+
+#Calculating CFR for each State
+US_state_CFR <- US_national_cleaned %>%
+  mutate(state = as.character(State)) %>%
+  group_by(state) %>%
+  
+  #Calculating Population Density
+  summarize(total_cases = sum(cases, na.rm = TRUE), 
+            total_deaths = sum(deaths, na.rm = TRUE),
+            total_population = sum(unique(Population), na.rm = TRUE)) %>%
+  mutate(CFR = ifelse(total_cases == 0, NA, total_deaths/total_cases)) %>% 
+  left_join(data.frame(state = state.name, area = state.area), by = "state") %>%
+  mutate(pop_density = total_population/area)
+  
+  plot_usmap(data = US_state_CFR, values = "CFR", color = "black") + 
+  scale_fill_gradient(low = "lightyellow", high = "darkred") + 
+  theme_minimal() +
+  labs(title = "COVID-19 Case Fatality Rate Total by State", fill = "CFR", tag = "C")
+
+  plot_usmap(data = US_state_CFR, values = "pop_density", color = "white") + 
+     scale_fill_gradient(low = "lightyellow", high = "darkred") + 
+  theme_minimal() +
+  labs(title = "Population Density by State", fill = "People per sq mi", tag = "D")
+```      
+**State CFR Analysis:**
+Plot C displays the aggregate CFR by State from February of 2020 to March of 2023. States with the darker shading of red experienced higher overall proportions of death among confirmed cases. Examining plot C we see the Northeastern states such as New York, Pennsylvania, and Massachusetts have the highest aggregate CFR. This is expected due to these states being among the earliest and most severely impacted. In contrast, states such as Hawaii, Alaska, and Utah had the lowest CFR potentially reflecting lower population densities compared to Northeastern states. As shown by plot D, population density likely played a significant role in the geographic variation of the observed CFRs. High population density states were able to spread the COVID-19 virus more effectively contributing to higher strains on the healthcare system such as hospital overcrowding and reduced quality of care for the severely ill. On the other hand states with lower population density could have experienced slower transmission allowing healthcare infrastructure and quality to be maintained. CFR was also measured at the state level reflecting varying differences between rural and urban care and reporting practices. 
+
+# Multiple Linear Regression Model
+To find the factors that predict the CFR by state, I ran a multiple linear regression model to find statistically significant predictors of a state's CFR. Earlier I calculated an estimate of population density for each state using the 2020 census population data included in the US_deaths_raw data set to test in my model to confirm the choropleth map's hypothesis of population density contributing to geographic variations in CFR. I was also curious if the total population of a state was a significant predictor of CFR. 
+
+```{r}
+
+model <- lm(CFR ~ pop_density + total_population, data = US_state_CFR)
+summary(model)
+
+```    
+*Multiple Linear Regression Model Analysis:* 
+Analyzing the results from the model, overall the model was statistically significant with an F-statistic of 5.51 and p-value of 0.007. However, the model's R-squared value of 0.1899 shows it explains about 19% of the variation in CFR suggesting the remaining 81% of the variation is unexplained by these two predictors. This remaining 81% in variation suggests there are other factors that were not included in this model such as healthcare resources, age and race demographics, and vaccination rates influencing the CFR variation. By the individual predictors, population density was a statistically significant predictor of state's CFR confirming the assumption from plot C and D. Interestingly, the total population of a state was not a significant predictor. These findings imply a larger concentration of people per square mile as opposed to the population size of a state is associated with higher COVID-19 case fatality rates. 
+
+## Bias and Limitations 
+
+Reporting Bias: When cleaning the data sets there were "Unassigned" counties observations demonstrating some states or counties had poor attribution which could have led to underestimating case fatality rates. Data was also aggregated at the state level not accounting for differences between rural and urban healthcare access and reporting practices.
+
+Testing Bias: The case fatality rate was extremely high early on in the pandemic and likely the consequence of restricted testing. Restricted testing during this period influenced the true infection fatality rate which was most likely lower than what is reflected in the data. When testing was expanded in April of 2020 (CDC, 2024), the CFR declined sharply as mild and asymptomatic cases were being accounted for. 
+
+Model Limitations: The model showed only 19% of the variation in the case fatality rate can be explained by population density and size. Other factors were not able to be captured and could strengthen the analysis further for future research.
+
+Personal Bias: Being a citizen of the United States, and my personal experience through the COVID-19 pandemic, could have influenced the questions I addressed in this analysis, leading me to focus on the United States as opposed to globally. It could also have influenced my visualization choices, leaning more on choropleth maps to convey my analysis. 
+
+## Conclusion 
+
+My analysis investigated the COVID-19 case fatality rates across the United States from February of 2020 to March of 2023. Given the 33% CFR peak in March of 2020, the CFR steadily declined after expanded resources for testing, vaccinations becoming accessible to the public, and other factors such as mask mandates and social distancing requirements. The analysis showed states with higher population densities had the highest aggregate CFRs compared to states with lower population densities that had the lowest CFRs throughout the pandemic. The multiple regression model confirmed population density was a statistically significant predictor of case fatality rates while total population size was not. Ultimately, this suggested the concentration of people rather than total population of a state explained the CFR variation. Future research integrating age or race demographics, healthcare capacity, and vaccination rates could further help explain the 81% of CFR variation the predictors could not. 
+
+## References 
+
+Centers for Disease Control and Prevention. (2024, July 8). CDC Museum Covid-19 Timeline. Centers for Disease Control and Prevention. https://www.cdc.gov/museum/timeline/covid19.html 
+
+```{r}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
