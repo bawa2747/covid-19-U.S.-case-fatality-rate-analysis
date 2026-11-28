@@ -1,9 +1,15 @@
 # Covid-19 U.S. Case Fatality Rate Analysis
-Exploratory data analysis of the U.S. Covid-19 case fatality rates by state using the Johns Hopkins CSSE data set from February 2020 to March 2023, visualizing the overall trend, and using multiple linear regression to find factors that predict a state's case fatality rate (CFR).
+Exploratory data analysis of the U.S. Covid-19 case fatality rates by state using the Johns Hopkins CSSE data set from February 2020 to March 2023, visualizing the overall trend, and using multiple linear regression to find factors that predict a state's case fatality rate (CFR). Exploring the data, I aimed to gain insight into: 
+
+1. What was the overall trend of the COVID-19 case fatality rate across the United States?
+
+2. Which states had an overall high case fatality rate?
+
+3. What factors can predict a state's case fatality rate?
 
 ## Key Findings
-- CFRs started out high then continuously declined, likely due to testing, treatments, and improvement of vaccination rates
-- Population density was a **statistically significant** predictor of a state's CFR, consistent with CFR geographic variation shown in the choropleth visualization of CFR Total by State vs Population Density by State
+- CFRs started out high then continuously declined, likely due to testing, treatments, and improvement of vaccination rates.
+- Population density was a **statistically significant** predictor of a state's CFR, consistent with CFR geographic variation shown in the choropleth visualization of CFR Total by State vs Population Density by State.
 - However, it only explained about **19%** of the variation in CFR, suggesting the remaining 81% of the CFR variation could be affected by variables such as a state's healthcare resources, age and race demographics, and vaccination rates that were not included in the model.
   
 ## Methods
